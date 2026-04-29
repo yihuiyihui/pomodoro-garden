@@ -63,7 +63,7 @@ function GrassTufts() {
     return function() { clearInterval(id); };
   }, []);
 
-  var cols = 7, rows = 8;
+  var cols = 10, rows = 8;
   var cellW = 100 / cols, cellH = 100 / rows;
   var shades = [GRASS.dark, GRASS.dark, GRASS.mid, GRASS.light, GRASS.light, GRASS.pale];
   var tufts = [];
@@ -89,7 +89,7 @@ function GrassTufts() {
           display: "flex", gap: 2, alignItems: "flex-end",
           pointerEvents: "none", zIndex: 0,
           transform: "translate(-50%, -50%) translateX(" + sway + "px)",
-          transition: "transform 0.6s ease-in-out",
+          transition: "transform 0.3s ease-in-out",
         }}>
           <div style={{ width: 3, height: lh, backgroundColor: color }} />
           <div style={{ width: 3, height: ch, backgroundColor: color }} />
