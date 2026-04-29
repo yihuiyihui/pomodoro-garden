@@ -63,7 +63,7 @@ function GrassTufts() {
     return function() { clearInterval(id); };
   }, []);
 
-  var cols = 6, rows = 8;
+  var cols = 7, rows = 8;
   var cellW = 100 / cols, cellH = 100 / rows;
   var shades = [GRASS.dark, GRASS.dark, GRASS.mid, GRASS.light, GRASS.light, GRASS.pale];
   var tufts = [];
@@ -81,7 +81,7 @@ function GrassTufts() {
       var ch = 8 + Math.floor(rng() * 4);
       var rh = 6 + Math.floor(rng() * 3);
       var wobble = ((i + frame) % 4);
-      var sway = wobble === 0 ? -1.5 : wobble === 1 ? 0 : wobble === 2 ? 1.5 : 0;
+      var sway = wobble === 0 ? -1.5 : wobble === 1 ? 1.5 : 0;
 
       tufts.push(
         <div key={"g" + i} style={{
@@ -245,7 +245,7 @@ function PixelGardenBed(props) {
             })}
           </g>);
         })}
-        {tomatoes.length===0&&<text x={svgW/2} y={(bedPxH/2+4)*PX} textAnchor="middle" fill={P.soilPale} fontSize="14" fontFamily="'Press Start 2P',monospace" opacity="0.5">empty garden</text>}
+        {tomatoes.length===0&&<text x={svgW/2} y={(bedPxH/2+4)*PX} textAnchor="middle" fill={P.soilPale} fontSize="14" fontFamily="'Press Start 2P',monospace" opacity="0.5"></text>}
       </svg>
       {tomatoes.some(function(t){return t.message;})&&<p style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:P.cream,textAlign:"center",marginTop:6,opacity:0.6,textShadow:"1px 1px 0 rgba(0,0,0,0.4)"}}>click a tomato to read a message</p>}
     </div>
@@ -311,7 +311,7 @@ function PomodoroGarden() {
 
         <div style={{width:"100%",maxWidth:700,marginBottom:24,textAlign:"left"}}>
           <h1 style={{fontFamily:"'Press Start 2P',monospace",fontSize:13,color:P.cream,margin:"0 0 6px",textShadow:"2px 2px 0 rgba(0,0,0,0.4)"}}>Communal Pomodoro Garden</h1>
-          <p style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:P.cream,margin:0,opacity:0.75,textShadow:"1px 1px 0 rgba(0,0,0,0.4)",lineHeight:1.8}}>Grow tomatoes together with a community<br/>of tomato gardeners</p>
+          <p style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:P.cream,margin:0,opacity:0.75,textShadow:"1px 1px 0 rgba(0,0,0,0.4)",lineHeight:1.8}}>Grow tomatoes together with other<br/> tomato gardeners</p>
         </div>
 
         <div style={{position:"relative",background:P.soilBase,border:"3px solid "+P.wood1,padding:"16px 20px 12px",marginBottom:32,minWidth:260,boxShadow:"4px 4px 0 rgba(0,0,0,0.3)",overflow:"visible"}}>
