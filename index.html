@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Communal Pomodoro Garden</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { width: 100%; min-height: 100vh; }
+  body { font-family: 'Press Start 2P', monospace; }
+  button:hover { filter: brightness(1.15); }
+  button:active { filter: brightness(0.9); }
+  input::placeholder { color: #8B6340; opacity: 0.6; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── REPLACE THIS WITH YOUR APPS SCRIPT URL IF YOU REDEPLOY ───
+const API_URL = 'https://script.google.com/macros/s/AKfycbxYhhpghIkdfQeBmypjyxeIvXbdX2vkUSNVGh7l4hG--hk93m8JeXCmrTcPU5Rjg4qA/exec';
+
+const SESSION = { FOCUS: 25 * 60, SHORT_BREAK: 5 * 60, LONG_BREAK: 30 * 60 };
+const TOTAL_ROUNDS = 4;
+const P = {
+  soilDark: "#2A1508", soilBase: "#3E2215", soilMid: "#54301E", soilLight: "#6B4228",
+  soilHighlight: "#7D5535", soilPale: "#926840",
+  wood1: "#6B4423", wood2: "#7A5432", wood3: "#8B6340", woodDark: "#4E3018",
+  green1: "#2D6B1E", green2: "#3E8C2A", green3: "#52A838", green4: "#6BC44E", green5: "#8FD86E",
+  red1: "#A82020", red2: "#CC3333", red3: "#E84040", red4: "#F06050",
+  orange1: "#D07020", yellow1: "#E8C030",
+  cream: "#F0E0C8", dialogBg: "#F8F0D8", dialogBorder: "#8B6340", dialogText: "#3B2215",
+};
+const PX = 4;
+const GRASS = { bg: "#7EC8A4", dark: "#4A9A78", mid: "#5DAD8A", light: "#A0DCC0", pale: "#B4E8D0" };
+
+function playChime() {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [440, 554.37, 659.25].forEach(function(freq, i) {
+      var osc = ctx.createOscillator(); var gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = "square";
+      gain.gain.setValueAtTime(0.06, ctx.currentTime + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.4);
+      osc.start(ctx.currentTime + i * 0.12); osc.stop(ctx.currentTime + i * 0.12 + 0.4);
+    });
+  } catch (e) {}
+}
+function fmt(s) { return Math.floor(s / 60).toString().padStart(2, "0") + ":" + (s % 60).toString().padStart(2, "0"); }
+function seededRandom(seed) { var s = Math.abs(seed) || 1; return function() { s = (s * 16807) % 2147483647; return s / 2147483647; }; }
+function Px(props) { return <rect x={props.x * PX} y={props.y * PX} width={(props.w || 1) * PX} height={(props.h || 1) * PX} fill={props.color} />; }
+
+function GrassTufts() {
+  var _f = useState(0), frame = _f[0], setFrame = _f[1];
+  useEffect(function() {
+    var id = setInterval(function() { setFrame(function(f) { return (f + 1) % 4; }); }, 900);
+    return function() { clearInterval(id); };
+  }, []);
+
+  var cols = 6, rows = 8;
+  var cellW = 100 / cols, cellH = 100 / rows;
+  var shades = [GRASS.dark, GRASS.dark, GRASS.mid, GRASS.light, GRASS.light, GRASS.pale];
+  var tufts = [];
+
+  for (var r = 0; r < rows; r++) {
+    for (var c = 0; c < cols; c++) {
+      var i = r * cols + c;
+      var rng = seededRandom(i * 73 + 13);
+      var jitterX = (rng() - 0.5) * cellW * 0.8;
+      var jitterY = (rng() - 0.5) * cellH * 0.8;
+      var xPct = (c + 0.5) * cellW + jitterX;
+      var yPct = (r + 0.5) * cellH + jitterY;
+      var color = shades[Math.floor(rng() * shades.length)];
+      var lh = 6 + Math.floor(rng() * 3);
+      var ch = 8 + Math.floor(rng() * 4);
+      var rh = 6 + Math.floor(rng() * 3);
+      var wobble = ((i + frame) % 4);
+      var sway = wobble === 0 ? -1.5 : wobble === 1 ? 0 : wobble === 2 ? 1.5 : 0;
+
+      tufts.push(
+        <div key={"g" + i} style={{
+          position: "absolute", left: xPct + "%", top: yPct + "%",
+          display: "flex", gap: 2, alignItems: "flex-end",
+          pointerEvents: "none", zIndex: 0,
+          transform: "translate(-50%, -50%) translateX(" + sway + "px)",
+          transition: "transform 0.6s ease-in-out",
+        }}>
+          <div style={{ width: 3, height: lh, backgroundColor: color }} />
+          <div style={{ width: 3, height: ch, backgroundColor: color }} />
+          <div style={{ width: 3, height: rh, backgroundColor: color }} />
+        </div>
+      );
+    }
+  }
+  return <>{tufts}</>;
+}
+
+function PixelTomato(props) {
+  var x = props.x, y = props.y, glow = props.glow;
+  var colors = { red: { main: P.red2, light: P.red4, dark: P.red1, hi: "#F09070" }, green: { main: P.green2, light: P.green4, dark: P.green1, hi: P.green5 }, orange: { main: P.orange1, light: "#E89040", dark: "#A05818", hi: "#F0B060" } };
+  var c = colors[props.color || "red"] || colors.red;
+  return (<g>
+    {glow && <rect x={(x - 1) * PX} y={(y - 2) * PX} width={6 * PX} height={7 * PX} rx={4} fill="#FFE060" opacity="0.35" />}
+    {glow && <rect x={(x - 1) * PX} y={(y - 2) * PX} width={6 * PX} height={7 * PX} rx={4} fill="none" stroke="#FFD700" strokeWidth="1.5" opacity="0.7" />}
+    <Px x={x} y={y} w={4} color={c.main}/><Px x={x} y={y+1} w={4} color={c.main}/><Px x={x} y={y+2} w={4} color={c.main}/><Px x={x+1} y={y+3} w={2} color={c.main}/>
+    <Px x={x} y={y} w={2} color={c.light}/><Px x={x} y={y} color={c.hi}/>
+    <Px x={x+3} y={y+1} color={c.dark}/><Px x={x+3} y={y+2} color={c.dark}/><Px x={x+2} y={y+3} color={c.dark}/>
+    <Px x={x+1} y={y-1} w={2} color={P.green1}/><Px x={x} y={y} color={P.green2}/><Px x={x+3} y={y} color={P.green2}/>
+  </g>);
+}
+
+function PixelLeaf(props) {
+  var x=props.x,y=props.y,dir=props.dir||"right";
+  var g1=P.green3,g2=P.green4,g3=P.green2,gd=P.green1;
+  if(dir==="right") return(<g><Px x={x} y={y+1} color={gd}/><Px x={x+1} y={y} color={g1}/><Px x={x+1} y={y+1} color={g2}/><Px x={x+2} y={y} color={g2}/><Px x={x+2} y={y+1} color={g1}/><Px x={x+2} y={y+2} color={g2}/><Px x={x+3} y={y+1} color={g1}/><Px x={x+3} y={y+2} color={g3}/><Px x={x+4} y={y+1} color={g3}/><Px x={x+4} y={y+2} color={g2}/></g>);
+  if(dir==="left") return(<g><Px x={x+4} y={y+1} color={gd}/><Px x={x+3} y={y} color={g1}/><Px x={x+3} y={y+1} color={g2}/><Px x={x+2} y={y} color={g2}/><Px x={x+2} y={y+1} color={g1}/><Px x={x+2} y={y+2} color={g2}/><Px x={x+1} y={y+1} color={g1}/><Px x={x+1} y={y+2} color={g3}/><Px x={x} y={y+1} color={g3}/><Px x={x} y={y+2} color={g2}/></g>);
+  if(dir==="up") return(<g><Px x={x+1} y={y+3} color={gd}/><Px x={x} y={y+2} color={g1}/><Px x={x+1} y={y+2} color={g2}/><Px x={x+2} y={y+2} color={g1}/><Px x={x} y={y+1} color={g2}/><Px x={x+1} y={y+1} color={g1}/><Px x={x+2} y={y+1} color={g2}/><Px x={x+1} y={y} color={g3}/><Px x={x} y={y} color={g3}/></g>);
+  return(<g><Px x={x+1} y={y} color={gd}/><Px x={x} y={y+1} color={g1}/><Px x={x+1} y={y+1} color={g2}/><Px x={x+2} y={y+1} color={g1}/><Px x={x} y={y+2} color={g2}/><Px x={x+1} y={y+2} color={g1}/><Px x={x+2} y={y+2} color={g2}/><Px x={x+1} y={y+3} color={g3}/><Px x={x} y={y+3} color={g3}/></g>);
+}
+
+function GrowthStagePlant(props) {
+  var stage=props.stage,progress=props.progress||1,cx=props.cx||20,cy=props.cy||20;
+  if(stage===0) return(<g><Px x={cx-1} y={cy+1} w={3} color={P.soilMid}/><Px x={cx} y={cy} color={P.soilHighlight}/>{progress>0.5&&<Px x={cx} y={cy-1} color={P.green4}/>}</g>);
+  if(stage===1) return(<g><Px x={cx} y={cy-3} w={1} h={4} color={P.green2}/><PixelLeaf x={cx-4} y={cy-4} dir="left"/><PixelLeaf x={cx+1} y={cy-4} dir="right"/>{progress>0.5&&<PixelLeaf x={cx-2} y={cy-6} dir="up"/>}</g>);
+  if(stage===2) return(<g>
+    <Px x={cx} y={cy-11} w={1} h={12} color={P.green1}/>
+    <Px x={cx+1} y={cy-4} color={P.green1}/><Px x={cx-1} y={cy-7} color={P.green1}/><Px x={cx+1} y={cy-9} color={P.green1}/>
+    <PixelLeaf x={cx+2} y={cy-4} dir="right"/><PixelLeaf x={cx-6} y={cy-7} dir="left"/>
+    <PixelLeaf x={cx-3} y={cy-11} dir="up"/><PixelLeaf x={cx+2} y={cy-10} dir="right"/><PixelLeaf x={cx-5} y={cy-4} dir="left"/>
+    <PixelTomato x={cx+3} y={cy-6} color="green"/>
+  </g>);
+  var tColor=progress>0.6?"red":progress>0.3?"orange":"green";
+  return(<g>
+    <Px x={cx} y={cy-12} w={1} h={13} color={P.green1}/>
+    <Px x={cx+1} y={cy-5} color={P.green1}/><Px x={cx+2} y={cy-5} color={P.green1}/>
+    <Px x={cx-1} y={cy-8} color={P.green1}/><Px x={cx-2} y={cy-8} color={P.green1}/>
+    <Px x={cx+1} y={cy-10} color={P.green1}/><Px x={cx+1} y={cy-12} color={P.green1}/>
+    <PixelLeaf x={cx+3} y={cy-4} dir="right"/><PixelLeaf x={cx-7} y={cy-8} dir="left"/>
+    <PixelLeaf x={cx+2} y={cy-11} dir="right"/><PixelLeaf x={cx-4} y={cy-13} dir="up"/>
+    <PixelLeaf x={cx-2} y={cy-4} dir="down"/><PixelLeaf x={cx+3} y={cy-8} dir="right"/>
+    <PixelTomato x={cx+3} y={cy-6} color={tColor}/>
+  </g>);
+}
+
+function VineBorder() {
+  var vc=P.green1,vl=P.green2,lc=P.green3,ll=P.green4; var s=[];
+  for(var i=0;i<9;i++){var lx=14+i*28;s.push(<div key={"vt"+i} style={{position:"absolute",top:-4,left:lx}}><div style={{width:4,height:4,background:vc,position:"absolute",top:0,left:0}}/><div style={{width:4,height:4,background:vl,position:"absolute",top:0,left:5}}/><div style={{width:4,height:4,background:vc,position:"absolute",top:0,left:10}}/>{i%2===0&&<><div style={{width:4,height:4,background:lc,position:"absolute",top:-5,left:3}}/><div style={{width:4,height:4,background:ll,position:"absolute",top:-9,left:5}}/><div style={{width:4,height:4,background:lc,position:"absolute",top:-5,left:7}}/></>}</div>);}
+  for(var j=0;j<9;j++){var lxb=20+j*28;s.push(<div key={"vb"+j} style={{position:"absolute",bottom:-4,left:lxb}}><div style={{width:4,height:4,background:vc,position:"absolute",bottom:0,left:0}}/><div style={{width:4,height:4,background:vl,position:"absolute",bottom:0,left:5}}/>{j%2===1&&<><div style={{width:4,height:4,background:lc,position:"absolute",bottom:-5,left:4}}/><div style={{width:4,height:4,background:ll,position:"absolute",bottom:-9,left:6}}/></>}</div>);}
+  for(var k=0;k<7;k++){var ty=14+k*34;s.push(<div key={"vl"+k} style={{position:"absolute",left:-4,top:ty}}><div style={{width:4,height:4,background:vc,position:"absolute",left:0,top:0}}/><div style={{width:4,height:4,background:vl,position:"absolute",left:0,top:5}}/>{k%2===0&&<><div style={{width:4,height:4,background:lc,position:"absolute",left:-5,top:3}}/><div style={{width:4,height:4,background:ll,position:"absolute",left:-9,top:5}}/></>}</div>);}
+  for(var m=0;m<7;m++){var tyr=20+m*34;s.push(<div key={"vr"+m} style={{position:"absolute",right:-4,top:tyr}}><div style={{width:4,height:4,background:vc,position:"absolute",right:0,top:0}}/><div style={{width:4,height:4,background:vl,position:"absolute",right:0,top:5}}/>{m%2===1&&<><div style={{width:4,height:4,background:lc,position:"absolute",right:-5,top:4}}/><div style={{width:4,height:4,background:ll,position:"absolute",right:-9,top:6}}/></>}</div>);}
+  return <div style={{position:"absolute",inset:-1,pointerEvents:"none",overflow:"visible"}}>{s}</div>;
+}
+
+function GardenPlantStem(props) {
+  var x=props.x,y=props.y,seed=props.seed;
+  var rng=seededRandom(seed); var stemH=10+Math.floor(rng()*5);
+  var dirs=["left","right","up","down"]; var leaves=[];
+  for(var i=0;i<3+Math.floor(rng()*3);i++){var dir=dirs[Math.floor(rng()*4)];var ox=dir==="right"?1+Math.floor(rng()*2):dir==="left"?-5-Math.floor(rng()*2):-2+Math.floor(rng()*3);var oy=-stemH+2+Math.floor(rng()*(stemH-2));leaves.push({lx:x+ox,ly:y+oy,dir:dir});}
+  return(<g>
+    <Px x={x} y={y-stemH} w={1} h={stemH+1} color={P.green1}/><Px x={x+1} y={y-Math.floor(stemH*0.35)} color={P.green1}/><Px x={x-1} y={y-Math.floor(stemH*0.55)} color={P.green1}/><Px x={x+1} y={y-Math.floor(stemH*0.75)} color={P.green1}/>
+    {leaves.map(function(l,li){return <PixelLeaf key={li} x={l.lx} y={l.ly} dir={l.dir}/>;})}
+  </g>);
+}
+
+function GardenTomatoPositions(seed) {
+  var rng = seededRandom(seed);
+  var stemH = 10 + Math.floor(rng() * 5);
+  for(var i=0;i<3+Math.floor(rng()*3);i++){rng();rng();rng();}
+  return [
+    { ox: 2, oy: -Math.floor(stemH * 0.35) },
+    { ox: -6, oy: -Math.floor(stemH * 0.55) },
+    { ox: 3, oy: -Math.floor(stemH * 0.75) },
+    { ox: -5, oy: -Math.floor(stemH * 0.2) },
+  ];
+}
+
+function PixelCelebrationTomato() {
+  var s=5;
+  return(<svg width={9*s} height={10*s} viewBox={"0 0 "+(9*s)+" "+(10*s)} style={{imageRendering:"pixelated"}}>
+    <rect x={2*s} y={0} width={s} height={s} fill={P.green2}/><rect x={4*s} y={0} width={s} height={s} fill={P.green1}/><rect x={6*s} y={0} width={s} height={s} fill={P.green2}/>
+    <rect x={3*s} y={s} width={s} height={s} fill={P.green3}/><rect x={5*s} y={s} width={s} height={s} fill={P.green3}/>
+    <rect x={2*s} y={2*s} width={5*s} height={s} fill={P.red2}/><rect x={s} y={3*s} width={7*s} height={4*s} fill={P.red2}/><rect x={2*s} y={7*s} width={5*s} height={s} fill={P.red1}/>
+    <rect x={2*s} y={2*s} width={2*s} height={s} fill={P.red4}/><rect x={s} y={3*s} width={2*s} height={s} fill={P.red4}/><rect x={2*s} y={3*s} width={s} height={s} fill="#F09070"/>
+    <rect x={7*s} y={5*s} width={s} height={2*s} fill={P.red1}/>
+  </svg>);
+}
+
+function GameDialog(props) {
+  return(<div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.5)"}} onClick={props.onClose}>
+    <div onClick={function(e){e.stopPropagation();}} style={{background:P.dialogBg,border:"4px solid "+P.dialogBorder,boxShadow:"6px 6px 0 rgba(0,0,0,0.3),inset 0 0 0 2px "+P.cream,padding:"20px 24px",maxWidth:320,width:"90%"}}>{props.children}</div>
+  </div>);
+}
+
+function PixelGardenBed(props) {
+  var tomatoes=props.tomatoes, onTomatoClick=props.onTomatoClick;
+  var _hov=useState(null), hovKey=_hov[0], setHovKey=_hov[1];
+  var bedPxW=142, bedPxH=56, border=2;
+  var soilW=bedPxW-border*2, soilH=bedPxH-border*2;
+  var svgW=bedPxW*PX, svgH=(bedPxH+8)*PX;
+  var stalks=tomatoes.slice(0,20);
+  var cols=7;
+  var plantsData=stalks.map(function(stalk,i){
+    var rng=seededRandom(stalk.t+i*777);
+    var col=i%cols, row=Math.floor(i/cols);
+    var baseX=border+4+col*Math.floor((soilW-8)/cols)+Math.floor((rng()-0.5)*3);
+    var baseY=border+14+row*12+Math.floor((rng()-0.5)*3);
+    return{t:stalk.t,count:stalk.count,message:stalk.message,px:baseX,py:baseY,tCount:Math.min(stalk.count||1,4)};
+  });
+  var soilRows=[];
+  for(var ri=0;ri<Math.floor(soilH/4);ri++){var ry=border+3+ri*4;soilRows.push(<g key={"sr"+ri}><rect x={border*PX} y={ry*PX} width={soilW*PX} height={PX} fill={P.soilDark} opacity="0.7"/><rect x={border*PX} y={(ry+1)*PX} width={soilW*PX} height={PX} fill={P.soilLight} opacity="0.5"/><rect x={border*PX} y={(ry+2)*PX} width={soilW*PX} height={2*PX} fill={P.soilMid} opacity="0.3"/></g>);}
+  var specks=[];
+  for(var si=0;si<50;si++){var srng=seededRandom(si*53+500);specks.push(<Px key={"sp"+si} x={border+1+Math.floor(srng()*(soilW-2))} y={border+3+Math.floor(srng()*soilH)} color={[P.soilHighlight,P.soilPale,P.soilLight][Math.floor(srng()*3)]}/>);}
+
+  return(
+    <div style={{width:"100%",imageRendering:"pixelated",position:"relative"}}>
+      <svg width="100%" viewBox={"0 0 "+svgW+" "+svgH} style={{display:"block",imageRendering:"pixelated",overflow:"visible"}}>
+        <rect x={0} y={3*PX} width={svgW} height={bedPxH*PX} fill={P.wood1}/>
+        <rect x={0} y={3*PX} width={svgW} height={PX} fill={P.wood3}/><rect x={0} y={4*PX} width={svgW} height={PX} fill={P.wood2}/>
+        <rect x={0} y={(bedPxH+1)*PX} width={svgW} height={2*PX} fill={P.woodDark}/>
+        <rect x={0} y={3*PX} width={2*PX} height={bedPxH*PX} fill={P.wood2}/><rect x={svgW-2*PX} y={3*PX} width={2*PX} height={bedPxH*PX} fill={P.woodDark}/>
+        <rect x={border*PX} y={(border+3)*PX} width={soilW*PX} height={soilH*PX} fill={P.soilBase}/>
+        {soilRows}{specks}
+        {plantsData.map(function(p,pi){
+          var hasMsg=!!p.message;
+          var tps=GardenTomatoPositions(p.t+pi*777);
+          return(<g key={pi}>
+            <GardenPlantStem x={p.px} y={p.py} seed={p.t+pi*777}/>
+            {Array.from({length:Math.min(p.tCount,4)}).map(function(_,ti){
+              var tp=tps[ti];
+              var tomKey=pi+"-"+ti;
+              var isGlowing=hovKey===tomKey && hasMsg;
+              return(<g key={"tom"+ti}
+                style={{cursor:hasMsg?"pointer":"default"}}
+                onMouseEnter={function(){if(hasMsg)setHovKey(tomKey);}}
+                onMouseLeave={function(){setHovKey(null);}}
+                onClick={function(){if(hasMsg)onTomatoClick(p);}}>
+                <PixelTomato x={p.px+tp.ox} y={p.py+tp.oy} color="red" glow={isGlowing}/>
+              </g>);
+            })}
+          </g>);
+        })}
+        {tomatoes.length===0&&<text x={svgW/2} y={(bedPxH/2+4)*PX} textAnchor="middle" fill={P.soilPale} fontSize="14" fontFamily="'Press Start 2P',monospace" opacity="0.5">empty garden</text>}
+      </svg>
+      {tomatoes.some(function(t){return t.message;})&&<p style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:P.cream,textAlign:"center",marginTop:6,opacity:0.6,textShadow:"1px 1px 0 rgba(0,0,0,0.4)"}}>click a tomato to read a message</p>}
+    </div>
+  );
+}
+
+function PomodoroGarden() {
+  var _phase=useState("focus"),phase=_phase[0],setPhase=_phase[1];
+  var _time=useState(SESSION.FOCUS),timeLeft=_time[0],setTimeLeft=_time[1];
+  var _run=useState(false),running=_run[0],setRunning=_run[1];
+  var _round=useState(0),round=_round[0],setRound=_round[1];
+  var _tom=useState([]),tomatoes=_tom[0],setTomatoes=_tom[1];
+  var _cel=useState(false),showCelebration=_cel[0],setShowCelebration=_cel[1];
+  var _enc=useState(""),encouragement=_enc[0],setEncouragement=_enc[1];
+  var _msg=useState(null),viewingMessage=_msg[0],setViewingMessage=_msg[1];
+  var intervalRef=useRef(null);
+
+  // Load tomatoes from Google Sheets
+  useEffect(function(){
+    fetch(API_URL).then(function(r){return r.json();}).then(function(data){
+      if(data.tomatoes && data.tomatoes.length > 0) setTomatoes(data.tomatoes);
+    }).catch(function(e){ console.error("Load failed:", e); });
+  },[]);
+
+  // Save a new tomato to Google Sheets
+  var saveTomato = useCallback(function(message, count) {
+    return fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ message: message, count: count, sessionId: 'anon' }),
+    }).catch(function(e){ console.error("Save failed:", e); });
+  }, []);
+
+  useEffect(function(){
+    if(running&&timeLeft>0){intervalRef.current=setInterval(function(){setTimeLeft(function(t){return t-1;});},1000);}
+    else if(running&&timeLeft===0){
+      setRunning(false);playChime();
+      if(phase==="focus"){var next=round+1;if(next>=TOTAL_ROUNDS){setRound(4);setShowCelebration(true);}else{setRound(next);setPhase("shortBreak");setTimeLeft(SESSION.SHORT_BREAK);}}
+      else{setPhase("focus");setTimeLeft(SESSION.FOCUS);}
+    }
+    return function(){clearInterval(intervalRef.current);};
+  },[running,timeLeft,phase,round]);
+
+  function plantTomato(){
+    var msg = encouragement.trim();
+    var newTomato = { t: Date.now(), count: 1, message: msg };
+    var nt = tomatoes.concat([newTomato]);
+    setTomatoes(nt);
+    saveTomato(msg, 1);
+    setRound(0); setEncouragement(""); setShowCelebration(false);
+    setPhase("longBreak"); setTimeLeft(SESSION.LONG_BREAK);
+  }
+
+  var duration=phase==="focus"?SESSION.FOCUS:phase==="shortBreak"?SESSION.SHORT_BREAK:SESSION.LONG_BREAK;
+  var progress=1-timeLeft/duration;
+  var isBreak=phase!=="focus";
+  var phaseLabel=phase==="focus"?"Focus":phase==="shortBreak"?"Break":"Long Break";
+
+  return(
+    <div style={{minHeight:"100vh",width:"100%",backgroundColor:GRASS.bg,position:"relative"}}>
+      <GrassTufts/>
+
+      <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"16px 16px 40px"}}>
+
+        <div style={{width:"100%",maxWidth:700,marginBottom:24,textAlign:"left"}}>
+          <h1 style={{fontFamily:"'Press Start 2P',monospace",fontSize:13,color:P.cream,margin:"0 0 6px",textShadow:"2px 2px 0 rgba(0,0,0,0.4)"}}>Communal Pomodoro Garden</h1>
+          <p style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:P.cream,margin:0,opacity:0.75,textShadow:"1px 1px 0 rgba(0,0,0,0.4)",lineHeight:1.8}}>Grow tomatoes together with a community<br/>of tomato gardeners</p>
+        </div>
+
+        <div style={{position:"relative",background:P.soilBase,border:"3px solid "+P.wood1,padding:"16px 20px 12px",marginBottom:32,minWidth:260,boxShadow:"4px 4px 0 rgba(0,0,0,0.3)",overflow:"visible"}}>
+          <VineBorder/>
+          <svg width={160} height={140} viewBox={"0 0 "+(40*PX)+" "+(35*PX)} style={{imageRendering:"pixelated",display:"block",margin:"0 auto"}}>
+            <rect x={0} y={30*PX} width={40*PX} height={5*PX} fill={P.soilMid}/>
+            <GrowthStagePlant stage={Math.min(round,3)} progress={progress} cx={20} cy={29}/>
+          </svg>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:26,color:P.cream,letterSpacing:"3px",margin:"6px 0 2px",textAlign:"center"}}>{fmt(timeLeft)}</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:isBreak?P.yellow1:P.wood3,letterSpacing:"1px",marginBottom:12,textAlign:"center"}}>{phaseLabel}</div>
+          <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+            <button onClick={function(){setRunning(false);setTimeLeft(duration);}} style={{width:36,height:36,border:"2px solid "+P.wood3,background:P.soilMid,color:P.cream,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:4}}><span style={{fontSize:18,lineHeight:1}}>↻</span></button>
+            <button onClick={function(){setRunning(!running);}} style={{minWidth:56,height:36,border:"2px solid "+(isBreak?P.yellow1:P.red2),background:isBreak?P.orange1:P.red1,color:P.cream,fontFamily:"'Press Start 2P',monospace",fontSize:10,cursor:"pointer",letterSpacing:"1px",display:"flex",alignItems:"center",justifyContent:"center"}}>{running?"STOP":"GO"}</button>
+          </div>
+        </div>
+
+        <div style={{width:"100%",maxWidth:700}}>
+          <PixelGardenBed tomatoes={tomatoes} onTomatoClick={setViewingMessage}/>
+        </div>
+      </div>
+
+      {showCelebration&&(<GameDialog><div style={{textAlign:"center"}}>
+        <div style={{marginBottom:12,display:"inline-block"}}><PixelCelebrationTomato/></div>
+        <h2 style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:P.red3,margin:"0 0 10px"}}>PLANTED!</h2>
+        <p style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:P.dialogText,lineHeight:2.2,margin:"0 0 14px"}}>Leave a message for<br/>fellow gardeners:</p>
+        <div style={{position:"relative",marginBottom:16}}>
+          <input type="text" value={encouragement} onChange={function(e){setEncouragement(e.target.value.slice(0,100));}} placeholder="Keep growing..." maxLength={100} style={{width:"100%",padding:"8px 10px",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:P.dialogText,background:P.cream,border:"2px solid "+P.wood2,outline:"none",boxSizing:"border-box"}}/>
+          <span style={{position:"absolute",right:6,bottom:-14,fontFamily:"'Press Start 2P',monospace",fontSize:5,color:P.wood3}}>{encouragement.length}/100</span>
+        </div>
+        <div style={{display:"flex",gap:8,justifyContent:"center"}}>
+          <button onClick={plantTomato} style={{padding:"7px 16px",border:"2px solid "+P.red1,background:P.red2,color:P.cream,fontFamily:"'Press Start 2P',monospace",fontSize:7,cursor:"pointer"}}>PLANT</button>
+          <button onClick={function(){setEncouragement("");plantTomato();}} style={{padding:"7px 12px",border:"2px solid "+P.wood2,background:P.soilMid,color:P.cream,fontFamily:"'Press Start 2P',monospace",fontSize:7,cursor:"pointer"}}>SKIP</button>
+        </div>
+      </div></GameDialog>)}
+
+      {viewingMessage&&(<GameDialog onClose={function(){setViewingMessage(null);}}>
+        <div style={{textAlign:"center"}}>
+          <div style={{marginBottom:10,display:"inline-block"}}><PixelCelebrationTomato/></div>
+          <p style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:P.dialogText,lineHeight:2.2,margin:"0 0 14px",wordBreak:"break-word"}}>"{viewingMessage.message}"</p>
+          <button onClick={function(){setViewingMessage(null);}} style={{padding:"7px 16px",border:"2px solid "+P.wood2,background:P.soilMid,color:P.cream,fontFamily:"'Press Start 2P',monospace",fontSize:7,cursor:"pointer"}}>CLOSE</button>
+        </div>
+      </GameDialog>)}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<PomodoroGarden />);
+</script>
+</body>
+</html>
