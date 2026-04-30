@@ -25,6 +25,10 @@ const { useState, useEffect, useRef, useCallback } = React;
 // ─── REPLACE THIS WITH YOUR APPS SCRIPT URL IF YOU REDEPLOY ───
 const API_URL = 'https://script.google.com/macros/s/AKfycbxYhhpghIkdfQeBmypjyxeIvXbdX2vkUSNVGh7l4hG--hk93m8JeXCmrTcPU5Rjg4qA/exec';
 
+// ─── MUSIC: REPLACE THESE TWO LINES TO CHANGE THE TRACK ───
+const MUSIC_URL = 'https://cdn.pixabay.com/audio/2024/09/27/audio_2c8f1f3f4d.mp3';
+const MUSIC_CREDIT = '♪ Lofi Garden — Pixabay';
+
 const SESSION = { FOCUS: 25 * 60, SHORT_BREAK: 5 * 60, LONG_BREAK: 30 * 60 };
 const TOTAL_ROUNDS = 4;
 const P = {
@@ -102,9 +106,15 @@ function GrassTufts() {
 }
 
 function PixelTomato(props) {
-  var x = props.x, y = props.y, glow = props.glow;
-  var colors = { red: { main: P.red2, light: P.red4, dark: P.red1, hi: "#F09070" }, green: { main: P.green2, light: P.green4, dark: P.green1, hi: P.green5 }, orange: { main: P.orange1, light: "#E89040", dark: "#A05818", hi: "#F0B060" } };
-  var c = colors[props.color || "red"] || colors.red;
+  var x = props.x, y = props.y, glow = props.glow, mine = props.mine;
+  var colors = {
+    red: { main: P.red2, light: P.red4, dark: P.red1, hi: "#F09070" },
+    mine: { main: "#FF4444", light: "#FF7766", dark: "#C81818", hi: "#FFB090" },
+    green: { main: P.green2, light: P.green4, dark: P.green1, hi: P.green5 },
+    orange: { main: P.orange1, light: "#E89040", dark: "#A05818", hi: "#F0B060" }
+  };
+  var key = mine ? "mine" : (props.color || "red");
+  var c = colors[key] || colors.red;
   return (<g>
     {glow && <rect x={(x - 1) * PX} y={(y - 2) * PX} width={6 * PX} height={7 * PX} rx={4} fill="#FFE060" opacity="0.35" />}
     {glow && <rect x={(x - 1) * PX} y={(y - 2) * PX} width={6 * PX} height={7 * PX} rx={4} fill="none" stroke="#FFD700" strokeWidth="1.5" opacity="0.7" />}
@@ -197,8 +207,28 @@ function GameDialog(props) {
   </div>);
 }
 
+function MusicPlayer() {
+  var _p = useState(false), playing = _p[0], setPlaying = _p[1];
+  var audioRef = useRef(null);
+  function toggle() {
+    if (!audioRef.current) return;
+    if (playing) audioRef.current.pause();
+    else audioRef.current.play().catch(function(e){console.error(e);});
+    setPlaying(!playing);
+  }
+  return (
+    <div style={{position:"fixed",bottom:12,right:12,zIndex:50,display:"flex",alignItems:"center",gap:8}}>
+      <audio ref={audioRef} loop src={MUSIC_URL} />
+      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:P.cream,opacity:0.7,textShadow:"1px 1px 0 rgba(0,0,0,0.4)"}}>{MUSIC_CREDIT}</span>
+      <button onClick={toggle} style={{width:28,height:28,border:"2px solid "+P.wood3,background:P.soilMid,color:P.cream,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:4,fontSize:11,fontFamily:"'Press Start 2P',monospace"}}>
+        {playing ? "❚❚" : "▶"}
+      </button>
+    </div>
+  );
+}
+
 function PixelGardenBed(props) {
-  var tomatoes=props.tomatoes, onTomatoClick=props.onTomatoClick;
+  var tomatoes=props.tomatoes, onTomatoClick=props.onTomatoClick, myTomatoTs=props.myTomatoTs;
   var _hov=useState(null), hovKey=_hov[0], setHovKey=_hov[1];
   var bedPxW=142, bedPxH=56, border=2;
   var soilW=bedPxW-border*2, soilH=bedPxH-border*2;
@@ -210,7 +240,7 @@ function PixelGardenBed(props) {
     var col=i%cols, row=Math.floor(i/cols);
     var baseX=border+4+col*Math.floor((soilW-8)/cols)+Math.floor((rng()-0.5)*3);
     var baseY=border+14+row*12+Math.floor((rng()-0.5)*3);
-    return{t:stalk.t,count:stalk.count,message:stalk.message,px:baseX,py:baseY,tCount:Math.min(stalk.count||1,4)};
+    return{t:stalk.t,count:stalk.count,message:stalk.message,px:baseX,py:baseY,tCount:Math.min(stalk.count||1,4),isMine:myTomatoTs.indexOf(stalk.t)!==-1};
   });
   var soilRows=[];
   for(var ri=0;ri<Math.floor(soilH/4);ri++){var ry=border+3+ri*4;soilRows.push(<g key={"sr"+ri}><rect x={border*PX} y={ry*PX} width={soilW*PX} height={PX} fill={P.soilDark} opacity="0.7"/><rect x={border*PX} y={(ry+1)*PX} width={soilW*PX} height={PX} fill={P.soilLight} opacity="0.5"/><rect x={border*PX} y={(ry+2)*PX} width={soilW*PX} height={2*PX} fill={P.soilMid} opacity="0.3"/></g>);}
@@ -240,7 +270,7 @@ function PixelGardenBed(props) {
                 onMouseEnter={function(){if(hasMsg)setHovKey(tomKey);}}
                 onMouseLeave={function(){setHovKey(null);}}
                 onClick={function(){if(hasMsg)onTomatoClick(p);}}>
-                <PixelTomato x={p.px+tp.ox} y={p.py+tp.oy} color="red" glow={isGlowing}/>
+                <PixelTomato x={p.px+tp.ox} y={p.py+tp.oy} color="red" glow={isGlowing} mine={p.isMine}/>
               </g>);
             })}
           </g>);
@@ -261,39 +291,87 @@ function PomodoroGarden() {
   var _cel=useState(false),showCelebration=_cel[0],setShowCelebration=_cel[1];
   var _enc=useState(""),encouragement=_enc[0],setEncouragement=_enc[1];
   var _msg=useState(null),viewingMessage=_msg[0],setViewingMessage=_msg[1];
+  var _myTs=useState([]),myTomatoTs=_myTs[0],setMyTomatoTs=_myTs[1];
+  var _startTs=useState(null),startTs=_startTs[0],setStartTs=_startTs[1];
+  var _startTime=useState(SESSION.FOCUS),startTime=_startTime[0],setStartTime=_startTime[1];
   var intervalRef=useRef(null);
 
-  // Load tomatoes from Google Sheets
+  // Load tomatoes: cache first, then API
   useEffect(function(){
+    try {
+      var cached = localStorage.getItem('pomo-tomatoes');
+      if (cached) setTomatoes(JSON.parse(cached));
+      var mine = localStorage.getItem('pomo-my-tomatoes');
+      if (mine) setMyTomatoTs(JSON.parse(mine));
+    } catch(e) {}
     fetch(API_URL).then(function(r){return r.json();}).then(function(data){
-      if(data.tomatoes && data.tomatoes.length > 0) setTomatoes(data.tomatoes);
+      if(data.tomatoes){
+        setTomatoes(data.tomatoes);
+        try { localStorage.setItem('pomo-tomatoes', JSON.stringify(data.tomatoes)); } catch(e) {}
+      }
     }).catch(function(e){ console.error("Load failed:", e); });
   },[]);
 
-  // Save a new tomato to Google Sheets
-  var saveTomato = useCallback(function(message, count) {
+  var saveTomato = useCallback(function(message) {
     return fetch(API_URL, {
       method: 'POST',
-      body: JSON.stringify({ message: message, count: count, sessionId: 'anon' }),
+      body: JSON.stringify({ message: message }),
     }).catch(function(e){ console.error("Save failed:", e); });
   }, []);
 
+  // Timer using Date.now() so it survives backgrounded tabs
   useEffect(function(){
-    if(running&&timeLeft>0){intervalRef.current=setInterval(function(){setTimeLeft(function(t){return t-1;});},1000);}
-    else if(running&&timeLeft===0){
-      setRunning(false);playChime();
-      if(phase==="focus"){var next=round+1;if(next>=TOTAL_ROUNDS){setRound(4);setShowCelebration(true);}else{setRound(next);setPhase("shortBreak");setTimeLeft(SESSION.SHORT_BREAK);}}
-      else{setPhase("focus");setTimeLeft(SESSION.FOCUS);}
+    if (!running) return;
+    intervalRef.current = setInterval(function(){
+      var elapsed = Math.floor((Date.now() - startTs) / 1000);
+      var remaining = startTime - elapsed;
+      if (remaining <= 0) {
+        setTimeLeft(0);
+        setRunning(false);
+        playChime();
+        if (phase === "focus") {
+          var next = round + 1;
+          if (next >= TOTAL_ROUNDS) { setRound(4); setShowCelebration(true); }
+          else { setRound(next); setPhase("shortBreak"); setTimeLeft(SESSION.SHORT_BREAK); }
+        } else { setPhase("focus"); setTimeLeft(SESSION.FOCUS); }
+      } else {
+        setTimeLeft(remaining);
+      }
+    }, 250);
+    return function(){ clearInterval(intervalRef.current); };
+  },[running, startTs, startTime, phase, round]);
+
+  // Tab title countdown
+  useEffect(function(){
+    var label = phase==="focus"?"Focus":phase==="shortBreak"?"Break":"Long Break";
+    document.title = fmt(timeLeft) + " — " + label + " | Pomodoro Garden";
+  },[timeLeft, phase]);
+
+  function toggleTimer() {
+    if (!running) {
+      setStartTs(Date.now());
+      setStartTime(timeLeft);
     }
-    return function(){clearInterval(intervalRef.current);};
-  },[running,timeLeft,phase,round]);
+    setRunning(!running);
+  }
+  function resetTimer() {
+    setRunning(false);
+    setTimeLeft(duration);
+  }
 
   function plantTomato(){
     var msg = encouragement.trim();
-    var newTomato = { t: Date.now(), count: 1, message: msg };
+    var ts = Date.now();
+    var newTomato = { t: ts, count: 1, message: msg };
     var nt = tomatoes.concat([newTomato]);
     setTomatoes(nt);
-    saveTomato(msg, 1);
+    var newMine = myTomatoTs.concat([ts]);
+    setMyTomatoTs(newMine);
+    try {
+      localStorage.setItem('pomo-tomatoes', JSON.stringify(nt));
+      localStorage.setItem('pomo-my-tomatoes', JSON.stringify(newMine));
+    } catch(e) {}
+    saveTomato(msg);
     setRound(0); setEncouragement(""); setShowCelebration(false);
     setPhase("longBreak"); setTimeLeft(SESSION.LONG_BREAK);
   }
@@ -306,8 +384,9 @@ function PomodoroGarden() {
   return(
     <div style={{minHeight:"100vh",width:"100%",backgroundColor:GRASS.bg,position:"relative"}}>
       <GrassTufts/>
+      <MusicPlayer/>
 
-      <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"16px 16px 40px"}}>
+      <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"16px 16px 60px"}}>
 
         <div style={{width:"100%",maxWidth:700,marginBottom:24,textAlign:"left"}}>
           <h1 style={{fontFamily:"'Press Start 2P',monospace",fontSize:13,color:P.cream,margin:"0 0 6px",textShadow:"2px 2px 0 rgba(0,0,0,0.4)"}}>Communal Pomodoro Garden</h1>
@@ -323,13 +402,13 @@ function PomodoroGarden() {
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:26,color:P.cream,letterSpacing:"3px",margin:"6px 0 2px",textAlign:"center"}}>{fmt(timeLeft)}</div>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:isBreak?P.yellow1:P.wood3,letterSpacing:"1px",marginBottom:12,textAlign:"center"}}>{phaseLabel}</div>
           <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-            <button onClick={function(){setRunning(false);setTimeLeft(duration);}} style={{width:36,height:36,border:"2px solid "+P.wood3,background:P.soilMid,color:P.cream,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:4}}><span style={{fontSize:18,lineHeight:1}}>↻</span></button>
-            <button onClick={function(){setRunning(!running);}} style={{minWidth:56,height:36,border:"2px solid "+(isBreak?P.yellow1:P.red2),background:isBreak?P.orange1:P.red1,color:P.cream,fontFamily:"'Press Start 2P',monospace",fontSize:10,cursor:"pointer",letterSpacing:"1px",display:"flex",alignItems:"center",justifyContent:"center"}}>{running?"STOP":"GO"}</button>
+            <button onClick={resetTimer} style={{width:36,height:36,border:"2px solid "+P.wood3,background:P.soilMid,color:P.cream,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:4}}><span style={{fontSize:18,lineHeight:1}}>↻</span></button>
+            <button onClick={toggleTimer} style={{minWidth:56,height:36,border:"2px solid "+(isBreak?P.yellow1:P.red2),background:isBreak?P.orange1:P.red1,color:P.cream,fontFamily:"'Press Start 2P',monospace",fontSize:10,cursor:"pointer",letterSpacing:"1px",display:"flex",alignItems:"center",justifyContent:"center"}}>{running?"STOP":"GO"}</button>
           </div>
         </div>
 
         <div style={{width:"100%",maxWidth:700}}>
-          <PixelGardenBed tomatoes={tomatoes} onTomatoClick={setViewingMessage}/>
+          <PixelGardenBed tomatoes={tomatoes} onTomatoClick={setViewingMessage} myTomatoTs={myTomatoTs}/>
         </div>
       </div>
 
