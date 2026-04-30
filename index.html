@@ -85,7 +85,7 @@ function GrassTufts() {
       var ch = 8 + Math.floor(rng() * 4);
       var rh = 6 + Math.floor(rng() * 3);
       var wobble = ((i + frame) % 4);
-      var sway = wobble === 0 ? -1.0 : wobble === 1 ? 1.0 : 0;
+      var sway = wobble === 0 ? -2.0 : wobble === 1 ? 2.0 : 0;
 
       tufts.push(
         <div key={"g" + i} style={{
