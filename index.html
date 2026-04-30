@@ -67,7 +67,7 @@ function GrassTufts() {
     return function() { clearInterval(id); };
   }, []);
 
-  var cols = 10, rows = 8;
+  var cols = 12, rows = 8;
   var cellW = 100 / cols, cellH = 100 / rows;
   var shades = [GRASS.dark, GRASS.dark, GRASS.mid, GRASS.light, GRASS.light, GRASS.pale];
   var tufts = [];
@@ -85,7 +85,7 @@ function GrassTufts() {
       var ch = 8 + Math.floor(rng() * 4);
       var rh = 6 + Math.floor(rng() * 3);
       var wobble = ((i + frame) % 4);
-      var sway = wobble === 0 ? -1.5 : wobble === 1 ? 1.5 : 0;
+      var sway = wobble === 0 ? -1.0 : wobble === 1 ? 1.0 : 0;
 
       tufts.push(
         <div key={"g" + i} style={{
